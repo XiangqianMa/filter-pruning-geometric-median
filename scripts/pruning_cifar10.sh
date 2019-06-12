@@ -163,14 +163,14 @@ run20_1(){
 (pruning_scratch_resnet20 0 /data/yahe/cifar_GM2/scratch/cifar10_resnet20_ratenorm1_ratedist0.4_varience3 1 0.4)&
 }
 run20_2(){
-(pruning_pretrain_resnet20 0 /data/yahe/cifar_GM2/pretrain_0.01/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience1 1 0.1)&
-(pruning_pretrain_resnet20 0 /data/yahe/cifar_GM2/pretrain_0.01/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience2 1 0.1)&
-(pruning_pretrain_resnet20 0 /data/yahe/cifar_GM2/pretrain_0.01/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience3 1 0.1)&
+# (pruning_pretrain_resnet20 0 /data/yahe/cifar_GM2/pretrain_0.01/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience1 1 0.1)&
+# (pruning_pretrain_resnet20 0 /data/yahe/cifar_GM2/pretrain_0.01/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience2 1 0.1)&
+# (pruning_pretrain_resnet20 0 /data/yahe/cifar_GM2/pretrain_0.01/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience3 1 0.1)&
 
 
-(pruning_scratch_resnet20 0 /data/yahe/cifar_GM2/scratch/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience1 1 0.1)&
-(pruning_scratch_resnet20 0 /data/yahe/cifar_GM2/scratch/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience2 1 0.1)&
-(pruning_scratch_resnet20 0 /data/yahe/cifar_GM2/scratch/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience3 1 0.1)&
+(pruning_scratch_resnet20 0 ./data/cifar_GM2/scratch/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience1 1 0.1)
+# (pruning_scratch_resnet20 0 ./data/cifar_GM2/scratch/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience2 1 0.1)&
+# (pruning_scratch_resnet20 0 ./data/cifar_GM2/scratch/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience3 1 0.1)&
 }
 
 

@@ -19,24 +19,24 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='Trains ResNeXt on CIFAR or ImageNet',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('data_path', type=str, help='Path to dataset')
-parser.add_argument('--dataset', type=str, choices=['cifar10', 'cifar100', 'imagenet', 'svhn', 'stl10'],
+parser.add_argument('--data_path', type=str, default='./data/cifar.python', help='Path to dataset')
+parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10', 'cifar100', 'imagenet', 'svhn', 'stl10'],
                     help='Choose between Cifar10/100 and ImageNet.')
-parser.add_argument('--arch', metavar='ARCH', default='resnet18', choices=model_names,
+parser.add_argument('--arch', metavar='ARCH', default='resnet20', choices=model_names,
                     help='model architecture: ' + ' | '.join(model_names) + ' (default: resnext29_8_64)')
 # Optimization options
-parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to train.')
 parser.add_argument('--batch_size', type=int, default=128, help='Batch size.')
 parser.add_argument('--learning_rate', type=float, default=0.1, help='The Learning Rate.')
 parser.add_argument('--momentum', type=float, default=0.9, help='Momentum.')
 parser.add_argument('--decay', type=float, default=0.0005, help='Weight decay (L2 penalty).')
-parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
+parser.add_argument('--schedule', type=int, nargs='+', default=[30, 120, 160],
                     help='Decrease learning rate at these epochs.')
-parser.add_argument('--gammas', type=float, nargs='+', default=[0.1, 0.1],
+parser.add_argument('--gammas', type=float, nargs='+', default=[0.2, 0.2, 0.2],
                     help='LR is multiplied by gamma on schedule, number of gammas should be equal to schedule')
 # Checkpoints
 parser.add_argument('--print_freq', default=200, type=int, metavar='N', help='print frequency (default: 200)')
-parser.add_argument('--save_path', type=str, default='./', help='Folder to save checkpoints and log.')
+parser.add_argument('--save_path', type=str, default='./data/cifar_GM2/scratch/cifar10_resnet20_ratenorm0.7_ratedist0.1_varience1', help='Folder to save checkpoints and log.')
 parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
@@ -46,14 +46,14 @@ parser.add_argument('--workers', type=int, default=2, help='number of data loadi
 # random seed
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 # compress rate
-parser.add_argument('--rate_norm', type=float, default=0.9, help='the remaining ratio of pruning based on Norm')
+parser.add_argument('--rate_norm', type=float, default=1, help='the remaining ratio of pruning based on Norm')
 parser.add_argument('--rate_dist', type=float, default=0.1, help='the reducing ratio of pruning based on Distance')
 
-parser.add_argument('--layer_begin', type=int, default=1, help='compress layer of model')
-parser.add_argument('--layer_end', type=int, default=1, help='compress layer of model')
-parser.add_argument('--layer_inter', type=int, default=1, help='compress layer of model')
+parser.add_argument('--layer_begin', type=int, default=0, help='compress layer of model')
+parser.add_argument('--layer_end', type=int, default=54, help='compress layer of model')
+parser.add_argument('--layer_inter', type=int, default=3, help='compress layer of model')
 parser.add_argument('--epoch_prune', type=int, default=1, help='compress layer of model')
-parser.add_argument('--use_state_dict', dest='use_state_dict', action='store_true', help='use state dcit or not')
+parser.add_argument('--use_state_dict', dest='use_state_dict', action='store_true', help='use state dict or not')
 parser.add_argument('--use_pretrain', dest='use_pretrain', action='store_true', help='use pre-trained model or not')
 parser.add_argument('--pretrain_path', default='', type=str, help='..path of pre-trained model')
 parser.add_argument('--dist_type', default='l2', type=str, choices=['l2', 'l1', 'cos'], help='distance type of GM')
@@ -133,9 +133,11 @@ def main():
         assert False, 'Do not support dataset : {}'.format(args.dataset)
 
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,
-                                               num_workers=args.workers, pin_memory=True)
+                                            #    num_workers=args.workers, 
+                                               pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
-                                              num_workers=args.workers, pin_memory=True)
+                                            #   num_workers=args.workers, 
+                                              pin_memory=True)
 
     print_log("=> creating model '{}'".format(args.arch), log)
     # Init model, criterion, and optimizer
@@ -152,7 +154,7 @@ def main():
 
     if args.use_cuda:
         net.cuda()
-        criterion.cuda()
+        criterion.cuda()                    
 
     if args.use_pretrain:
         if os.path.isfile(args.pretrain_path):
@@ -301,9 +303,9 @@ def train(train_loader, model, criterion, optimizer, epoch, log, m):
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
-        top5.update(prec5[0], input.size(0))
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
+        top5.update(prec5.item(), input.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -354,9 +356,9 @@ def validate(val_loader, model, criterion, log):
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
-        top5.update(prec5[0], input.size(0))
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
+        top5.update(prec5.item(), input.size(0))
 
     print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5,
                                                                                                    error1=100 - top1.avg),
@@ -422,15 +424,15 @@ def load_obj(name):
 class Mask:
     def __init__(self, model):
         self.model_size = {}
-        self.model_length = {}
-        self.compress_rate = {}
-        self.distance_rate = {}
-        self.mat = {}
+        self.model_length = {} # 每一层的参数个数
+        self.compress_rate = {} # 范数准则的压缩比例，(1-compress_rate)的filter将被裁剪
+        self.distance_rate = {} # 距离准则的比例
+        self.mat = {} # 使用范数准则的mask，元素为0表示进行裁剪，1表示不进行裁剪
         self.model = model
-        self.mask_index = []
+        self.mask_index = [] # 需要进行裁剪的层的索引mask，为1进行裁剪，0不进行裁剪
         self.filter_small_index = {}
         self.filter_large_index = {}
-        self.similar_matrix = {}
+        self.similar_matrix = {} # 使用距离准则的mask
         self.norm_matrix = {}
 
     def get_codebook(self, weight_torch, compress_rate, length):
@@ -449,17 +451,27 @@ class Mask:
         return weight_np
 
     def get_filter_codebook(self, weight_torch, compress_rate, length):
+        """得出每一层的剪枝mask，范数准则，依据每一个滤波器的范数大小对每一层的滤波器由小到大进行排序，将前面的
+           (滤波器个数 * [1-compress_rate])个滤波器裁剪。
+           Args:
+                weight_torch：当前层的权重，torch
+                compress_rate：压缩比例，即剩余参数量与原始参数量的比例
+                length：当前层的参数个数
+           Return:
+                codebook：一维向量，每一个元素表示将当前层的所有参数张开为一维向量后，对应位置的参数是否被裁剪
+                          0表示裁剪，1表示不裁剪
+        """
         codebook = np.ones(length)
-        if len(weight_torch.size()) == 4:
-            filter_pruned_num = int(weight_torch.size()[0] * (1 - compress_rate))
-            weight_vec = weight_torch.view(weight_torch.size()[0], -1)
-            norm2 = torch.norm(weight_vec, 2, 1)
+        if len(weight_torch.size()) == 4: # 维度为4，说明为卷积层，只对卷积层进行裁剪
+            filter_pruned_num = int(weight_torch.size()[0] * (1 - compress_rate)) # 被裁剪的滤波器的数目
+            weight_vec = weight_torch.view(weight_torch.size()[0], -1) # 把每一个filter张开为一维向量
+            norm2 = torch.norm(weight_vec, 2, 1) # 计算每一个filter的范数
             norm2_np = norm2.cpu().numpy()
-            filter_index = norm2_np.argsort()[:filter_pruned_num]
+            filter_index = norm2_np.argsort()[:filter_pruned_num] # 被裁剪的滤波器的索引 
             #            norm1_sort = np.sort(norm1_np)
             #            threshold = norm1_sort[int (weight_torch.size()[0] * (1-compress_rate) )]
             kernel_length = weight_torch.size()[1] * weight_torch.size()[2] * weight_torch.size()[3]
-            for x in range(0, len(filter_index)):
+            for x in range(0, len(filter_index)): # 按照索引将对应的滤波器的mask置0
                 codebook[filter_index[x] * kernel_length: (filter_index[x] + 1) * kernel_length] = 0
 
             print("filter codebook done")
@@ -468,6 +480,8 @@ class Mask:
         return codebook
 
     def get_filter_index(self, weight_torch, compress_rate, length):
+        """得到范数准则下，被保留和被裁剪的滤波器的索引
+        """
         if len(weight_torch.size()) == 4:
             filter_pruned_num = int(weight_torch.size()[0] * (1 - compress_rate))
             weight_vec = weight_torch.view(weight_torch.size()[0], -1)
@@ -487,15 +501,15 @@ class Mask:
             pass
         return filter_small_index, filter_large_index
 
-    # optimize for fast ccalculation
+    # optimize for fast calculation
     def get_filter_similar(self, weight_torch, compress_rate, distance_rate, length, dist_type="l2"):
         codebook = np.ones(length)
         if len(weight_torch.size()) == 4:
-            filter_pruned_num = int(weight_torch.size()[0] * (1 - compress_rate))
-            similar_pruned_num = int(weight_torch.size()[0] * distance_rate)
+            filter_pruned_num = int(weight_torch.size()[0] * (1 - compress_rate)) # 范数准则裁剪的filter的数目
+            similar_pruned_num = int(weight_torch.size()[0] * distance_rate) # 距离准则裁剪的filter的数目
             weight_vec = weight_torch.view(weight_torch.size()[0], -1)
 
-            if dist_type == "l2" or "cos":
+            if dist_type == "l2" or "cos": # 不同的距离使用不同的范数，l2和cos使用L2范数，l1使用L1范数
                 norm = torch.norm(weight_vec, 2, 1)
                 norm_np = norm.cpu().numpy()
             elif dist_type == "l1":
@@ -519,18 +533,20 @@ class Mask:
 
             # distance using numpy function
             indices = torch.LongTensor(filter_large_index).cuda()
-            weight_vec_after_norm = torch.index_select(weight_vec, 0, indices).cpu().numpy()
+            weight_vec_after_norm = torch.index_select(weight_vec, 0, indices).cpu().numpy() # 去除依据范数准则裁剪掉的filter
             # for euclidean distance
-            if dist_type == "l2" or "l1":
+            if dist_type == "l2" or "l1": # 计算滤波器两两之间的距离
                 similar_matrix = distance.cdist(weight_vec_after_norm, weight_vec_after_norm, 'euclidean')
             elif dist_type == "cos":  # for cos similarity
                 similar_matrix = 1 - distance.cdist(weight_vec_after_norm, weight_vec_after_norm, 'cosine')
-            similar_sum = np.sum(np.abs(similar_matrix), axis=0)
+            similar_sum = np.sum(np.abs(similar_matrix), axis=0) # 每一个滤波器与所有滤波器的距离之和
 
             # for distance similar: get the filter index with largest similarity == small distance
+            # 距离最小表示相似性最大
             similar_large_index = similar_sum.argsort()[similar_pruned_num:]
             similar_small_index = similar_sum.argsort()[:  similar_pruned_num]
-            similar_index_for_filter = [filter_large_index[i] for i in similar_small_index]
+            similar_index_for_filter = [filter_large_index[i] for i in similar_small_index] # 转换回原始的filter的索引，依据距离
+                                                                                            # 准则裁剪的filter的索引。
 
             print('filter_large_index', filter_large_index)
             print('filter_small_index', filter_small_index)
@@ -552,6 +568,8 @@ class Mask:
         return x
 
     def init_length(self):
+        """计算每一层的参数个数
+        """
         for index, item in enumerate(self.model.parameters()):
             self.model_size[index] = item.size()
 
@@ -563,6 +581,8 @@ class Mask:
                     self.model_length[index1] *= self.model_size[index1][index2]
 
     def init_rate(self, rate_norm_per_layer, rate_dist_per_layer):
+        '''设置每一层的剪枝比例
+        '''
         for index, item in enumerate(self.model.parameters()):
             self.compress_rate[index] = 1
             self.distance_rate[index] = 1
@@ -578,15 +598,21 @@ class Mask:
             last_index = 165
         elif args.arch == 'resnet110':
             last_index = 327
-        # to jump the last fc layer
+        # 跳过最后一层全连接层，mask_index保存需要进行剪枝的层的索引号
         self.mask_index = [x for x in range(0, last_index, 3)]
 
     #        self.mask_index =  [x for x in range (0,330,3)]
 
     def init_mask(self, rate_norm_per_layer, rate_dist_per_layer, dist_type):
+        """初始化mask，总共有两个mask，一个依据范数准则产生，另一个依据距离准则产生。
+        """
+        # 设置每一层的剪枝比例
         self.init_rate(rate_norm_per_layer, rate_dist_per_layer)
+        # 针对每一层，依次设置裁剪mask
         for index, item in enumerate(self.model.parameters()):
+            # 如果该层参数需要进行剪枝
             if index in self.mask_index:
+                # 范数准则的mask，每一层都有一个mask，其中的每一个元素表示该层对应filter是否被裁剪
                 # mask for norm criterion
                 self.mat[index] = self.get_filter_codebook(item.data, self.compress_rate[index],
                                                            self.model_length[index])
@@ -597,7 +623,8 @@ class Mask:
                 # # get result about filter index
                 # self.filter_small_index[index], self.filter_large_index[index] = \
                 #     self.get_filter_index(item.data, self.compress_rate[index], self.model_length[index])
-
+                
+                # 距离准则的mask
                 # mask for distance criterion
                 self.similar_matrix[index] = self.get_filter_similar(item.data, self.compress_rate[index],
                                                                      self.distance_rate[index],
@@ -608,6 +635,9 @@ class Mask:
         print("mask Ready")
 
     def do_mask(self):
+        """范数准则，依据mask对参数进行裁剪（mask中对应元素为0参数被置为0，为1不变）
+        将每一层的参数张开为一维向量，与mask作element-wise乘后，在变换回原始形状
+        """
         for index, item in enumerate(self.model.parameters()):
             if index in self.mask_index:
                 a = item.data.view(self.model_length[index])
@@ -616,6 +646,8 @@ class Mask:
         print("mask Done")
 
     def do_similar_mask(self):
+        """距离准则，依据mask对参数进行裁剪
+        """
         for index, item in enumerate(self.model.parameters()):
             if index in self.mask_index:
                 a = item.data.view(self.model_length[index])
@@ -624,6 +656,8 @@ class Mask:
         print("mask similar Done")
 
     def do_grad_mask(self):
+        """梯度mask，对于那些被裁剪的filter（包括范数准则和距离准则），不需要进行梯度的反向传播
+        """
         for index, item in enumerate(self.model.parameters()):
             if index in self.mask_index:
                 a = item.grad.data.view(self.model_length[index])
@@ -635,6 +669,8 @@ class Mask:
         # print("grad zero Done")
 
     def if_zero(self):
+        """统计每一层0和非0参数的个数
+        """
         for index, item in enumerate(self.model.parameters()):
             if (index in self.mask_index):
                 # if index == 0:
